@@ -1,20 +1,32 @@
+# app/main.py
 from fastapi import FastAPI, Request
-import os, ssl, json, datetime, asyncpg
+import os, json, ssl, datetime
+import asyncpg
 
 app = FastAPI()
 
-def db_url() -> str:
-    u = os.getenv("DATABASE_URL")
-    if not u:
+# ---------- DB helpers ----------
+def get_db_url() -> str:
+    url = os.getenv("DATABASE_URL")
+    if not url:
         raise RuntimeError("DATABASE_URL missing")
-    return u
+    # Voor Supabase moet SSL aan. Query-param is ok, maar we forceren via context.
+    return url
 
 async def get_conn():
-    ctx = ssl.create_default_context()           # Supabase vereist SSL
-    return await asyncpg.connect(db_url(), ssl=ctx)
+    ctx = ssl.create_default_context()
+    # asyncpg gebruikt de SSL context hieronder
+    return await asyncpg.connect(get_db_url(), ssl=ctx)
 
+# ---------- Health ----------
 @app.get("/healthz")
-async def health():
+def healthz():
+    # app leeft
+    return {"ok": True}
+
+@app.get("/healthz_db")
+async def healthz_db():
+    # DB connectie test
     try:
         c = await get_conn()
         await c.close()
@@ -22,15 +34,16 @@ async def health():
     except Exception as e:
         return {"ok": False, "err": str(e)}
 
+# ---------- Trade ingest ----------
 @app.post("/webhook/trade")
-async def trade(req: Request):
-    # robuust JSON inlezen (MT5 kan \x00 of extra bytes sturen)
+async def webhook_trade(req: Request):
+    # MT5 kan \x00 of extra bytes meesturen. Eerst raw body veilig lezen.
     raw = await req.body()
     try:
-        txt = raw.decode("utf-8").replace("\x00", "").strip()
+        txt = raw.decode("utf-8", "ignore").replace("\x00", "").strip()
         payload = json.loads(txt)
     except Exception as e:
-        return {"status": "error", "type": "json_parse", "err": str(e), "raw": txt if 'txt' in locals() else None}
+        return {"status": "error", "type": "json_parse", "err": str(e)}
 
     t = payload.get("trade", {})
 
@@ -49,7 +62,8 @@ async def trade(req: Request):
 
     c = await get_conn()
     try:
-        await c.execute(sql,
+        await c.execute(
+            sql,
             t.get("ticket"),
             t.get("symbol"),
             t.get("direction"),
@@ -65,8 +79,9 @@ async def trade(req: Request):
     finally:
         await c.close()
 
+# ---------- Demo insert (handige test in browser) ----------
 @app.get("/webhook/demo")
-async def demo():
+async def webhook_demo():
     sql = """
     insert into trades(ticket, symbol, direction, lot, entry_price, opened_at_utc, status, magic)
     values($1,$2,$3,$4,$5,$6,$7,$8)
