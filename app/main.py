@@ -4,7 +4,10 @@ import os
 
 app = FastAPI()
 
-supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
+supabase = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_SERVICE_KEY")
+)
 
 @app.get("/health")
 def health():
@@ -14,4 +17,4 @@ def health():
 async def trade(request: Request):
     data = await request.json()
     supabase.table("trades").insert(data).execute()
-    return {"status": "saved"}
+    return {"saved": True}
