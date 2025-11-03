@@ -1,9 +1,57 @@
 services:
   - type: web
-    name: ingest-worker
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn ingest_worker.main:app --host 0.0.0.0 --port $PORT
+    name: ingest-worker-1
+    env: docker
+    plan: starter
+    branch: main
+    numInstances: 1
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: INGEST_TOKEN
+        sync: false
+      - key: TZ
+        value: Europe/Amsterdam
+
+  - type: web
+    name: ingest-worker-2
+    env: docker
+    plan: starter
+    branch: main
+    numInstances: 1
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: INGEST_TOKEN
+        sync: false
+      - key: TZ
+        value: Europe/Amsterdam
+
+  - type: web
+    name: ingest-worker-3
+    env: docker
+    plan: starter
+    branch: main
+    numInstances: 1
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: INGEST_TOKEN
+        sync: false
+      - key: TZ
+        value: Europe/Amsterdam
+
+  - type: web
+    name: ingest-worker-4
+    env: docker
+    plan: starter
+    branch: main
     numInstances: 1
     envVars:
       - key: SUPABASE_URL
