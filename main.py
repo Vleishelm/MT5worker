@@ -57,29 +57,36 @@ class TradeIn(BaseModel):
 
 @app.post("/ingest/trade")
 async def ingest_trade(payload: TradeIn):
-    # 1) snapshot opslaan
     snapshot_data = payload.snapshot.dict()
-    # forceer UTC
-    if snapshot_data["taken_at_utc"].tzinfo is None:
-        snapshot_data["taken_at_utc"] = snapshot_data["taken_at_utc"].replace(tzinfo=timezone.utc)
+
+    # 1) datetime → ISO8601 string
+    dt = snapshot_data.get("taken_at_utc")
+    if dt is not None:
+        if getattr(dt, "tzinfo", None) is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        snapshot_data["taken_at_utc"] = dt.isoformat()
 
     async with httpx.AsyncClient(timeout=15) as client:
+        # snapshot
         r1 = await client.post(f"{REST_URL}/market_snapshots", headers=HEADERS, json=[snapshot_data])
         if r1.status_code not in (200, 201):
-            raise HTTPException(status_code=500, detail=f"snapshot insert fail: {r1.text}")
+            raise HTTPException(status_code=500, detail=f"snapshot insert fail: {r1.status_code} {r1.text}")
         snapshot_id = r1.json()[0]["id"]
 
-        # 2) trade opslaan met snapshot_id
+        # 2) trade
         trade_dict = payload.dict()
         trade_dict["snapshot_id"] = snapshot_id
         trade_dict.pop("snapshot")
-        # zorg voor UTC
+
         for k in ("entry_time_utc", "exit_time_utc"):
-            if trade_dict.get(k) and (getattr(trade_dict[k], "tzinfo", None) is None):
-                trade_dict[k] = trade_dict[k].replace(tzinfo=timezone.utc)
+            dt = trade_dict.get(k)
+            if dt is not None:
+                if getattr(dt, "tzinfo", None) is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                trade_dict[k] = dt.isoformat()
+
         r2 = await client.post(f"{REST_URL}/trades", headers=HEADERS, json=[trade_dict])
         if r2.status_code not in (200, 201):
-            raise HTTPException(status_code=500, detail=f"trade insert fail: {r2.text}")
+            raise HTTPException(status_code=500, detail=f"trade insert fail: {r2.status_code} {r2.text}")
 
     return {"ok": True, "trade": r2.json()[0]}
-
