@@ -90,3 +90,43 @@ async def ingest_trade(payload: TradeIn):
             raise HTTPException(status_code=500, detail=f"trade insert fail: {r2.status_code} {r2.text}")
 
     return {"ok": True, "trade": r2.json()[0]}
+
+
+
+hieronder, news
+
+from typing import Optional
+
+class NewsIn(BaseModel):
+    source: str = "forexfactory"
+    event_key: str                     # unieke sleutel bv. "2025-11-03_JPY_CPI_yoy"
+    currency: str                      # "JPY" | "CNY" | "USD"
+    impact: str                        # "Red" | "Orange" | "Yellow"
+    title: str
+    scheduled_time_utc: datetime
+    tentative: Optional[bool] = False
+
+@app.post("/ingest/news")
+async def ingest_news(items: list[NewsIn]):
+    payload = []
+    for n in items:
+        d = n.dict()
+        dt = d["scheduled_time_utc"]
+        if getattr(dt, "tzinfo", None) is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        d["scheduled_time_utc"] = dt.isoformat()
+        payload.append(d)
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.post(f"{REST_URL}/news_events",
+                              headers=HEADERS, json=payload)
+        # 409 bij unique event_key? Dan upsert:
+        if r.status_code in (409, 422):
+            r = await client.patch(
+                f"{REST_URL}/news_events?event_key=in.({','.join([p['event_key'] for p in payload])})",
+                headers=HEADERS, json=payload
+            )
+        if r.status_code not in (200, 201):
+            raise HTTPException(status_code=500, detail=f"news insert fail: {r.status_code} {r.text}")
+    return {"ok": True, "count": len(payload)}
+
