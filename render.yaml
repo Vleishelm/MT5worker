@@ -1,9 +1,11 @@
 services:
+  # 1) bestaand: ingest API
   - type: web
-    name: MT5worker-1
+    name: MT5worker
     env: docker
     plan: starter
     branch: main
+    healthCheckPath: /health
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -11,42 +13,37 @@ services:
         sync: false
       - key: INGEST_TOKEN
         sync: false
+      - key: TZ
+        value: Europe/Amsterdam
 
-  - type: web
-    name: MT5worker-2
-    env: docker
+  # 2) nieuws-collector (dagelijks 21:45 A'dam → 01:00–07:00 volgende dag)
+  - type: worker
+    name: news-collector
+    env: python
     plan: starter
-    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app/news_collector.py
+    schedule: "45 21 * * *"
     envVars:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: INGEST_TOKEN
-        sync: false
+      - key: TZ
+        value: Europe/Amsterdam
 
-  - type: web
-    name: MT5worker-3
-    env: docker
+  # 3) aggregator (dagelijks 02:15 A'dam)
+  - type: worker
+    name: aggregator
+    env: python
     plan: starter
-    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app/aggregator.py
+    schedule: "15 2 * * *"
     envVars:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: INGEST_TOKEN
-        sync: false
-
-  - type: web
-    name: MT5worker-4
-    env: docker
-    plan: starter
-    branch: main
-    envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: INGEST_TOKEN
-        sync: false
+      - key: TZ
+        value: Europe/Amsterdam
