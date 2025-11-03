@@ -1,55 +1,52 @@
 # app/main.py
-import os
-from datetime import datetime, timezone
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
-import psycopg2
-from psycopg2.extras import execute_values
+import os, requests
 
-DATABASE_URL = os.environ["DATABASE_URL"]
-INGEST_SECRET = os.environ.get("INGEST_SECRET", "")
+SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
+SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+HEAD = {"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json"}
+INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "")
 
 app = FastAPI()
-
-def conn():
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
-
-class TradeIn(BaseModel):
-    ticket: int
-    symbol: str
-    direction: str  # 'buy' of 'sell'
-    lot: float
-    entry_price: float
-    opened_at_utc: float | str   # epoch of ISO
-    status: str = "open"
-    magic: int | None = None
 
 @app.get("/health")
 def health():
     return {"ok": True}
 
-@app.post("/ingest/trade")
-def ingest_trade(body: TradeIn, x_mt5_sig: str | None = Header(None)):
-    if INGEST_SECRET and x_mt5_sig != INGEST_SECRET:
-        raise HTTPException(401, "bad signature")
+class Payload(BaseModel):
+    trade_uid:str; broker:str; account_id:str; symbol:str; magic:int; direction:str
+    open_time:str; open_price:float; volume_lots:float
+    close_time:str|None=None; close_price:float|None=None
+    commission:float=0; swap:float=0; profit:float|None=None
+    sl:float|None=None; tp:float|None=None; grid_leg:int=0; comment:str|None=None
+    indicators:dict|None=None
 
-    # tijd normaliseren
-    if isinstance(body.opened_at_utc, (int, float)):
-        opened = datetime.fromtimestamp(body.opened_at_utc, tz=timezone.utc)
-    else:
-        opened = datetime.fromisoformat(str(body.opened_at_utc).replace("Z","")).astimezone(timezone.utc)
+@app.post("/mt5/trade")
+def ingest(p: Payload, authorization: str = Header(default="")):
+    if authorization != f"Bearer {INGEST_TOKEN}":
+        raise HTTPException(401, "unauthorized")
 
-    row = (
-        body.ticket, body.symbol, body.direction, body.lot,
-        body.entry_price, opened.isoformat(), body.status, body.magic
+    # 1) upsert naar public.trades
+    tr = p.model_dump()
+    ind = tr.pop("indicators", None)
+    r = requests.post(
+        f"{SB_URL}/rest/v1/trades",
+        headers=HEAD, json=[tr],
+        params={"on_conflict":"trade_uid","return":"minimal"}
     )
+    if r.status_code >= 300:
+        raise HTTPException(500, f"trades upsert failed: {r.text}")
 
-    with conn() as c, c.cursor() as cur:
-        execute_values(cur,
-            """insert into public.trades
-               (ticket,symbol,direction,lot,entry_price,opened_at_utc,status,magic)
-               values %s
-               on conflict (ticket) do nothing""",
-            [row]
+    # 2) upsert naar public.trade_indicators (optioneel)
+    if ind:
+        ind_row = {"trade_uid": p.trade_uid, **ind}
+        r2 = requests.post(
+            f"{SB_URL}/rest/v1/trade_indicators",
+            headers=HEAD, json=[ind_row],
+            params={"on_conflict":"trade_uid","return":"minimal"}
         )
+        if r2.status_code >= 300:
+            raise HTTPException(500, f"indicators upsert failed: {r2.text}")
+
     return {"ok": True}
