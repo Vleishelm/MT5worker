@@ -1,10 +1,9 @@
 services:
   - type: web
-    name: ingest-worker-1
+    name: MT5worker-1
     env: docker
     plan: starter
     branch: main
-    numInstances: 1
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -12,15 +11,12 @@ services:
         sync: false
       - key: INGEST_TOKEN
         sync: false
-      - key: TZ
-        value: Europe/Amsterdam
 
   - type: web
-    name: ingest-worker-2
+    name: MT5worker-2
     env: docker
     plan: starter
     branch: main
-    numInstances: 1
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -28,15 +24,12 @@ services:
         sync: false
       - key: INGEST_TOKEN
         sync: false
-      - key: TZ
-        value: Europe/Amsterdam
 
   - type: web
-    name: ingest-worker-3
+    name: MT5worker-3
     env: docker
     plan: starter
     branch: main
-    numInstances: 1
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -44,15 +37,12 @@ services:
         sync: false
       - key: INGEST_TOKEN
         sync: false
-      - key: TZ
-        value: Europe/Amsterdam
 
   - type: web
-    name: ingest-worker-4
+    name: MT5worker-4
     env: docker
     plan: starter
     branch: main
-    numInstances: 1
     envVars:
       - key: SUPABASE_URL
         sync: false
@@ -60,5 +50,3 @@ services:
         sync: false
       - key: INGEST_TOKEN
         sync: false
-      - key: TZ
-        value: Europe/Amsterdam
