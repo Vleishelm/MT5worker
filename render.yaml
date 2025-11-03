@@ -1,48 +1,11 @@
 services:
   - type: web
-    name: MT5worker-1
+    name: MT5worker
     env: docker
     plan: starter
     branch: main
-    envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: INGEST_TOKEN
-        sync: false
-
-  - type: web
-    name: MT5worker-2
-    env: docker
-    plan: starter
-    branch: main
-    envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: INGEST_TOKEN
-        sync: false
-
-  - type: web
-    name: MT5worker-3
-    env: docker
-    plan: starter
-    branch: main
-    envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: INGEST_TOKEN
-        sync: false
-
-  - type: web
-    name: MT5worker-4
-    env: docker
-    plan: starter
-    branch: main
+    numInstances: 4
+    healthCheckPath: /health
     envVars:
       - key: SUPABASE_URL
         sync: false
