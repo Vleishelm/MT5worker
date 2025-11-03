@@ -91,10 +91,6 @@ async def ingest_trade(payload: TradeIn):
 
     return {"ok": True, "trade": r2.json()[0]}
 
-
-
-hieronder, news
-
 from typing import Optional
 
 class NewsIn(BaseModel):
